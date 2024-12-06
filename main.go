@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"encoding/json"
 	"net/http"
 	"github.com/gorilla/mux"
@@ -18,13 +19,14 @@ type Product struct {
 var products = []Product{}
 
 func main() {
+	fmt.Println("Starting the server...")
 	r := mux.NewRouter()
 
-	r.HandleFunc("products", getProducts).Methods("GET")
-	r.HandleFunc("products/{id}", getProduct).Methods("GET")
-	r.HandleFunc("products", createProduct).Methods("POST")
-	r.HandleFunc("products/{id}", updateProduct).Methods("PUT")
-	r.HandleFunc("products/{id}", deleteProduct).Methods("DELETE")
+	r.HandleFunc("/products", getProducts).Methods("GET")
+	r.HandleFunc("/products/{id}", getProduct).Methods("GET")
+	r.HandleFunc("/products", createProduct).Methods("POST")
+	r.HandleFunc("/products/{id}", updateProduct).Methods("PUT")
+	r.HandleFunc("/products/{id}", deleteProduct).Methods("DELETE")
 
 	http.ListenAndServe(":8080", r)
 }
