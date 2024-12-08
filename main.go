@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	_ "github.com/lib/pq"
 	"github.com/gorilla/mux"
 	"strconv"
 )
@@ -16,7 +19,21 @@ type Product struct {
 	Stock       int     `json:"stock"`
 }
 
-var products = []Product{}
+var db *sql.DB
+
+func initDB() {
+	var err error
+	// Connect to PostgreSQL
+	connStr := "user=rufusbiggs password=Curry123! dbname=ecommerce sslmode=disable"
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("Error opening database: %v\n", err)
+	}
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Error connecting to the database: %v\n", err)
+	}
+	fmt.Println("Database connection established")
+}
 
 func main() {
 	fmt.Println("Starting the server...")
