@@ -8,7 +8,6 @@ import (
 	"net/http"
 	_ "github.com/lib/pq"
 	"github.com/gorilla/mux"
-	"strconv"
 )
 
 type Product struct {
@@ -36,6 +35,9 @@ func initDB() {
 }
 
 func main() {
+	initDB()
+	defer db.Close()
+
 	fmt.Println("Starting the server...")
 	r := mux.NewRouter()
 
@@ -49,51 +51,93 @@ func main() {
 }
 
 func getProducts(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application.json")
+	rows, err := db.Query("SELECT id, name, description, price, stock FROM products")
+	if err != nil {
+		http.Error(w, "Failed to query products", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var product Product
+		err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.Stock)
+		if err != nil {
+			http.Error(w, "Failed to scan product", http.StatusInternalServerError)
+			return
+		}
+		products = append(products, product)
+	}
 	json.NewEncoder(w).Encode(products)
 }
 
 func getProduct(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	for _, product := range products {
-		if product.ID == params["id"] {
-			json.NewEncoder(w).Encode(product)
-			return
-		}
+	id := params["id"]
+
+	var product Product
+	err := db.QueryRow("SELECT id, name, description, price, stock FROM products WHERE id = $1", id).
+		Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.Stock)
+	if err == sql.ErrNoRows {
+		http.NotFound(w, r)
+		return
 	}
-	http.NotFound(w, r)
+	if err != nil {
+		http.Error(w, "Failed to query product", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(product)
 }
 
 func createProduct(w http.ResponseWriter, r *http.Request) {
 	var product Product
-	json.NewDecoder(r.Body).Decode(&product)
-	product.ID = strconv.Itoa(len(products) + 1)
-	products = append(products, product)
+	err := json.NewDecoder(r.Body).Decode(&product)
+	if err != nil {
+		http.Error(w, "Invalid Input", http.StatusBadRequest)
+		return
+	}
+	err = db.QueryRow(
+		"INSERT INTO products (name, description, price, stock) VALUES ($1, $2, $3, $4) RETURNING id", 
+		product.Name, product.Description, product.Price, product.Stock,
+	).Scan(&product.ID)
+	if err != nil {
+		http.Error(w, "Failed to create product", http.StatusInternalServerError)
+		return
+	}
 	json.NewEncoder(w).Encode(product)
 }
 
 func updateProduct(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	for i, product := range products {
-		if product.ID == params["id"] {
-			var updatedProduct Product
-			json.NewDecoder(r.Body).Decode(&updatedProduct)
-			updatedProduct.ID = product.ID
-			products[i] = updatedProduct
-			json.NewEncoder(w).Encode(product)
-			return
-		}
+	id := params["id"]
+	
+	var product Product
+	err := json.NewDecoder(r.Body).Decode(&product)
+	if err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
 	}
-	http.NotFound(w, r)
+
+	_, err = db.Exec(
+		"UPDATE products SET name=$1, description=$2, price=$3, stock=$4 WHERE id=$5",
+		product.Name, product.Description, product.Price, product.Stock, id,
+	)
+	if err != nil {
+		http.Error(w, "Failed to update product", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func deleteProduct(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	for i, product := range products {
-		if product.ID == params["id"] {
-			products = append(products[:i], products[i+1:]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	id := params["id"]
+
+	_, err := db.Exec("DELETE FROM products WHERE id=$1", id)
+	if err != nil {
+		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
+		return
 	}
-	http.NotFound(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
