@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"time"
 	"net/http"
 	_ "github.com/lib/pq"
 	"github.com/gorilla/mux"
@@ -22,16 +24,27 @@ var db *sql.DB
 
 func initDB() {
 	var err error
-	// Connect to PostgreSQL
-	connStr := "user=rufusbiggs password=Curry123! dbname=ecommerce sslmode=disable"
-	db, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Error opening database: %v\n", err)
+	// Build connection string using environment variables
+	connStr := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s sslmode=disabled",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+	)
+
+	// Retry logic to wait for database to be ready
+	for i := 0; i < 5; i++ {
+		db, err = sql.Open("postgres", connStr)
+		if err == nil && db.Ping() == nil {
+			fmt.Println("Database connection established")
+			return
+		}
+		log.Printf("Error connecting to the database: %v. Retrying in 2 seconds...\n", err)
+		time.Sleep(2 * time.Second)
 	}
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Error connecting to the database: %v\n", err)
-	}
-	fmt.Println("Database connection established")
+	
+	log.Fatalf("Could not connect to the database after retries: %v", err)
 }
 
 func main() {

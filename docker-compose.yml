@@ -13,7 +13,7 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASSWORD=yourpassword
+      - DB_PASSWORD=Curry123!
       - DB_NAME=ecommerce
     restart: always
 
@@ -21,12 +21,13 @@ services:
     image: postgres:14
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_PASSWORD: Curry123!
       POSTGRES_DB: ecommerce
     ports:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./create_products_table.sql:/docker-entrypoint-initdb.d/create_products_table.sql
     restart: always
 
 volumes:
