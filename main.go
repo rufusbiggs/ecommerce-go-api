@@ -26,22 +26,32 @@ func initDB() {
 	var err error
 	// Build connection string using environment variables
 	connStr := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s sslmode=disabled",
+		"host=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_NAME"),
 	)
+	fmt.Printf("Database connection string: %s\n", connStr)
 
 	// Retry logic to wait for database to be ready
 	for i := 0; i < 5; i++ {
 		db, err = sql.Open("postgres", connStr)
-		if err == nil && db.Ping() == nil {
-			fmt.Println("Database connection established")
-			return
+		if err != nil {
+			fmt.Printf("Error opening database: %v. Retrying...\n", err)
+			time.Sleep(2 * time.Second)
+			continue
 		}
-		log.Printf("Error connecting to the database: %v. Retrying in 2 seconds...\n", err)
-		time.Sleep(2 * time.Second)
+		
+		pingErr := db.Ping()
+		if pingErr != nil {
+			log.Printf("Error pinging database: %v. Retrying...\n", pingErr)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		fmt.Println("Database connection established")
+		return
 	}
 	
 	log.Fatalf("Could not connect to the database after retries: %v", err)
